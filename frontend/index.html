@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingestion Console</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #131a22;
+    --line: #232d38;
+    --text: #d7e0e8;
+    --dim: #6b7c8c;
+    --accent: #4fd1a5;
+    --warn: #e8b34f;
+    --err: #e8615a;
+    --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 0;
+    color: var(--text);
+  }
+  header h1 .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 9px;
+    box-shadow: 0 0 6px var(--accent);
+  }
+  header .sub { color: var(--dim); font-size: 11px; }
+
+  main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 1px;
+    background: var(--line);
+  }
+  .col { background: var(--bg); padding: 22px 24px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .panel h2 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--dim);
+    margin: 0 0 12px 0;
+    font-weight: 600;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 160px;
+    background: #0a0f14;
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    resize: vertical;
+  }
+  textarea:focus, select:focus, button:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .row { display: flex; align-items: center; justify-content: space-between; margin: 12px 0; }
+  .toggle-label { color: var(--text); font-size: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .toggle {
+    width: 34px; height: 18px; border-radius: 10px; background: var(--line);
+    position: relative; cursor: pointer; transition: background 0.15s; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--err); }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--text); transition: transform 0.15s;
+  }
+  .toggle.on::after { transform: translateX(16px); }
+
+  select {
+    background: #0a0f14; color: var(--text); border: 1px solid var(--line);
+    border-radius: 4px; padding: 6px 8px; font-family: var(--mono); font-size: 12px;
+  }
+
+  button.primary {
+    width: 100%;
+    background: var(--accent);
+    color: #0a0f14;
+    border: none;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.ghost {
+    background: transparent; color: var(--dim); border: 1px solid var(--line);
+    border-radius: 4px; padding: 5px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer;
+  }
+  button.ghost:hover { color: var(--text); border-color: var(--dim); }
+
+  .result-box {
+    margin-top: 12px; padding: 10px; border-radius: 4px; font-size: 11px;
+    border: 1px solid var(--line); white-space: pre-wrap; word-break: break-all; display: none;
+  }
+  .result-box.show { display: block; }
+  .result-box.ok { border-color: var(--accent); color: var(--accent); }
+  .result-box.dup { border-color: var(--warn); color: var(--warn); }
+  .result-box.err { border-color: var(--err); color: var(--err); }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+  .tab {
+    background: transparent; color: var(--dim); border: 1px solid var(--line);
+    border-radius: 4px; padding: 6px 12px; font-family: var(--mono); font-size: 11px;
+    cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .tab.active { color: var(--bg); background: var(--text); border-color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: var(--dim); font-weight: 600; font-size: 10px; text-transform: uppercase;
+       letter-spacing: 0.05em; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 7px 8px; border-bottom: 1px solid #1a2129; vertical-align: top; }
+  tr:hover td { background: #171f28; }
+
+  .badge { padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge.processed { background: rgba(79,209,165,0.15); color: var(--accent); }
+  .badge.duplicate { background: rgba(232,179,79,0.15); color: var(--warn); }
+  .badge.rejected, .badge.failed { background: rgba(232,97,90,0.15); color: var(--err); }
+  .badge.received { background: rgba(107,124,140,0.2); color: var(--dim); }
+
+  .empty { color: var(--dim); font-size: 12px; padding: 20px 0; text-align: center; }
+  .flags { color: var(--warn); font-size: 10px; }
+
+  .agg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat { background: #0a0f14; border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
+  .stat .n { font-size: 20px; font-weight: 700; color: var(--accent); }
+  .stat .l { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+  .filters { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filters input {
+    background: #0a0f14; color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+    padding: 6px 8px; font-family: var(--mono); font-size: 11px; flex: 1;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="dot"></span>Fault-Tolerant Ingestion Console</h1>
+  <span class="sub" id="apiTarget"></span>
+</header>
+
+<main>
+  <div class="col">
+    <div class="panel">
+      <h2>Submit Raw Event</h2>
+      <select id="preset" onchange="applyPreset()" style="width:100%; margin-bottom:10px;">
+        <option value="clean">Preset: well-formed event</option>
+        <option value="messy">Preset: messy field names</option>
+        <option value="missing">Preset: missing fields</option>
+        <option value="noclient">Preset: unrecoverable (no client id)</option>
+      </select>
+      <textarea id="payload"></textarea>
+
+      <div class="row">
+        <label class="toggle-label" onclick="toggleFailure()">
+          <span class="toggle" id="failToggle"></span>
+          Simulate DB write failure
+        </label>
+        <button class="ghost" onclick="resendLast()">Resend last (retry)</button>
+      </div>
+
+      <button class="primary" onclick="submitEvent()">Submit Event →</button>
+      <div class="result-box" id="result"></div>
+    </div>
+
+    <div class="panel">
+      <h2>How dedup works here</h2>
+      <div style="color: var(--dim); font-size: 11px; line-height: 1.6;">
+        Each event is fingerprinted from its normalized <b>client + metric + amount + timestamp</b>.
+        That hash has a UNIQUE constraint in the database. Resubmitting the exact same event —
+        whether by accident, retry, or on purpose — is caught as a <span style="color:var(--warn)">duplicate</span> and
+        never double-counted, with no reliance on a client-supplied event ID.
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h2>Aggregated Results</h2>
+      <div class="filters">
+        <input id="filterClient" placeholder="filter: client_id" oninput="loadAggregate()">
+        <input id="filterFrom" placeholder="from (ISO timestamp)" oninput="loadAggregate()">
+        <input id="filterTo" placeholder="to (ISO timestamp)" oninput="loadAggregate()">
+      </div>
+      <div class="agg-grid" id="aggStats"></div>
+      <table>
+        <thead><tr><th>Client</th><th>Metric</th><th>Count</th><th>Total</th><th>Avg</th></tr></thead>
+        <tbody id="aggBody"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Event Log</h2>
+      <div class="tabs">
+        <button class="tab active" data-status="" onclick="setTab(this,'')">All</button>
+        <button class="tab" data-status="processed" onclick="setTab(this,'processed')">Processed</button>
+        <button class="tab" data-status="duplicate" onclick="setTab(this,'duplicate')">Duplicate</button>
+        <button class="tab" data-status="failed" onclick="setTab(this,'failed')">Failed</button>
+        <button class="tab" data-status="rejected" onclick="setTab(this,'rejected')">Rejected</button>
+      </div>
+      <table>
+        <thead><tr><th>ID</th><th>Status</th><th>Client hint</th><th>Note</th><th>Received</th></tr></thead>
+        <tbody id="eventsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+const API = 'http://localhost:8000';
+document.getElementById('apiTarget').textContent = API;
+
+const presets = {
+  clean: {source:"client_A", payload:{metric:"page_view", amount:"1200", timestamp:"2024-01-01T10:00:00Z"}},
+  messy: {client:"client_B", value: 87.5, date: "01/15/2024"},
+  missing: {source:"client_C", payload:{metric:"signup"}},
+  noclient: {payload:{metric:"click", amount:5}}
+};
+function applyPreset(){
+  const p = document.getElementById('preset').value;
+  document.getElementById('payload').value = JSON.stringify(presets[p], null, 2);
+}
+applyPreset();
+
+let failureOn = false;
+let lastPayload = null;
+function toggleFailure(){
+  failureOn = !failureOn;
+  document.getElementById('failToggle').classList.toggle('on', failureOn);
+}
+
+async function submitEvent(){
+  let body;
+  try { body = JSON.parse(document.getElementById('payload').value); }
+  catch(e){ showResult('err', 'Invalid JSON in payload box.'); return; }
+  lastPayload = body;
+  await doSubmit(body);
+}
+async function resendLast(){
+  if(!lastPayload){ showResult('err', 'Nothing submitted yet to resend.'); return; }
+  await doSubmit(lastPayload);
+}
+async function doSubmit(body){
+  try {
+    const res = await fetch(`${API}/ingest?simulate_failure=${failureOn}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    const cls = data.status === 'processed' ? 'ok' : data.status === 'duplicate' ? 'dup' : 'err';
+    showResult(cls, JSON.stringify(data, null, 2));
+    loadEvents(); loadAggregate();
+  } catch(e){
+    showResult('err', 'Request failed — is the backend running at ' + API + '?\\n' + e.message);
+  }
+}
+function showResult(cls, text){
+  const box = document.getElementById('result');
+  box.className = 'result-box show ' + cls;
+  box.textContent = text;
+}
+
+let currentStatus = '';
+function setTab(btn, status){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  currentStatus = status;
+  loadEvents();
+}
+
+async function loadEvents(){
+  const q = currentStatus ? `?status=${currentStatus}` : '';
+  try {
+    const res = await fetch(`${API}/events${q}`);
+    const rows = await res.json();
+    const tbody = document.getElementById('eventsBody');
+    if(!rows.length){ tbody.innerHTML = '<tr><td colspan="5" class="empty">No events yet.</td></tr>'; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>#${r.id}</td>
+        <td><span class="badge ${r.status}">${r.status}</span></td>
+        <td>${r.client_hint ?? '—'}</td>
+        <td>${r.error ? r.error : '—'}</td>
+        <td>${new Date(r.received_at).toLocaleTimeString()}</td>
+      </tr>`).join('');
+  } catch(e){ /* backend not up yet — ignore, header note covers it */ }
+}
+
+async function loadAggregate(){
+  const client = document.getElementById('filterClient').value;
+  const from = document.getElementById('filterFrom').value;
+  const to = document.getElementById('filterTo').value;
+  const params = new URLSearchParams();
+  if(client) params.set('client_id', client);
+  if(from) params.set('from_ts', from);
+  if(to) params.set('to_ts', to);
+  try {
+    const res = await fetch(`${API}/aggregate?${params}`);
+    const data = await res.json();
+    document.getElementById('aggStats').innerHTML = `
+      <div class="stat"><div class="n">${data.overall.count ?? 0}</div><div class="l">Processed events</div></div>
+      <div class="stat"><div class="n">${(data.overall.total ?? 0).toFixed(2)}</div><div class="l">Total amount</div></div>
+      <div class="stat"><div class="n">${data.breakdown.length}</div><div class="l">Client × metric groups</div></div>
+    `;
+    const body = document.getElementById('aggBody');
+    body.innerHTML = data.breakdown.length ? data.breakdown.map(r => `
+      <tr><td>${r.client_id}</td><td>${r.metric}</td><td>${r.count}</td>
+      <td>${r.total != null ? r.total.toFixed(2) : '—'}</td>
+      <td>${r.avg != null ? r.avg.toFixed(2) : '—'}</td></tr>
+    `).join('') : '<tr><td colspan="5" class="empty">No processed events match these filters.</td></tr>';
+  } catch(e){ /* backend not up yet */ }
+}
+
+loadEvents();
+loadAggregate();
+setInterval(()=>{ loadEvents(); loadAggregate(); }, 4000);
+</script>
+</body>
+</html>
